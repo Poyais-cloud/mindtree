@@ -1,0 +1,13 @@
+{
+  "name": "mindtree-backend",
+  "version": "1.0.0",
+  "description": "智语心聊 - 心理对话应用后端",
+  "main": "index.js",
+  "scripts": {
+    "dev": "node --watch index.js",
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5"
+  }
+}

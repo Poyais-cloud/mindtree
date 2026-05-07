@@ -1,0 +1,331 @@
+/**
+ * 全局样式 + 主题系统
+ *
+ * 技术方案：用 CSS 变量 + [data-theme="x"] 属性选择器实现主题切换。
+ * 优点：
+ *   - 纯 CSS 切换，无运行时开销
+ *   - 所有组件用 var(--bg-primary) 等变量，自动随主题变化
+ *   - 新增主题只需加一个 [data-theme="xxx"] 块
+ */
+
+/* ============ 默认主题：温暖米色（beige） ============ */
+:root,
+[data-theme="beige"] {
+  --bg-primary:   #faf7f2;
+  --bg-secondary: #ffffff;
+  --bg-tertiary:  #f5f0e8;
+  --text-primary:   #3d3935;
+  --text-secondary: #6b6660;
+  --text-tertiary:  #9a948d;
+  --accent:       #a68b6e;
+  --accent-light: #d9c7ae;
+  --accent-soft:  #ede3d2;
+  --border:       #e8e1d4;
+  --user-bubble:  #a68b6e;
+  --user-bubble-text: #ffffff;
+  --ai-bubble:    #ffffff;
+  --danger:       #c2756a;
+  --shadow:        0 2px 12px rgba(166, 139, 110, 0.08);
+  --shadow-strong: 0 4px 20px rgba(166, 139, 110, 0.12);
+
+  /* 代码块配色（跟主题同一色系） */
+  --code-bg:     #f5f0e8;
+  --code-head:   #ede3d2;
+  --code-text:   #3d3935;
+}
+
+/* ============ 夜间主题（dark） ============ */
+[data-theme="dark"] {
+  --bg-primary:   #1c1b1a;
+  --bg-secondary: #26241f;
+  --bg-tertiary:  #201e1b;
+  --text-primary:   #ece6d9;
+  --text-secondary: #b0a896;
+  --text-tertiary:  #78716b;
+  --accent:       #c9a878;
+  --accent-light: #5e4e3d;
+  --accent-soft:  #2e2a24;
+  --border:       #3a342c;
+  --user-bubble:  #c9a878;
+  --user-bubble-text: #1c1b1a;
+  --ai-bubble:    #26241f;
+  --danger:       #d88b80;
+  --shadow:        0 2px 12px rgba(0, 0, 0, 0.25);
+  --shadow-strong: 0 4px 20px rgba(0, 0, 0, 0.4);
+
+  --code-bg:     #1a1916;
+  --code-head:   #2e2a24;
+  --code-text:   #ece6d9;
+}
+
+/* ============ 清晨主题（blue） ============ */
+[data-theme="blue"] {
+  --bg-primary:   #f4f7fb;
+  --bg-secondary: #ffffff;
+  --bg-tertiary:  #eaf0f7;
+  --text-primary:   #2c3647;
+  --text-secondary: #5b6776;
+  --text-tertiary:  #94a0b0;
+  --accent:       #6b8caf;
+  --accent-light: #b9ccdf;
+  --accent-soft:  #dde7f1;
+  --border:       #dde4ed;
+  --user-bubble:  #6b8caf;
+  --user-bubble-text: #ffffff;
+  --ai-bubble:    #ffffff;
+  --danger:       #c56969;
+  --shadow:        0 2px 12px rgba(107, 140, 175, 0.1);
+  --shadow-strong: 0 4px 20px rgba(107, 140, 175, 0.15);
+
+  --code-bg:     #eef3f8;
+  --code-head:   #dde7f1;
+  --code-text:   #2c3647;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #app {
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB",
+    "Microsoft YaHei", sans-serif;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+input, textarea {
+  font-family: inherit;
+  outline: none;
+  border: none;
+  color: inherit;
+  background: transparent;
+}
+
+/* ========== 过渡动画 ========== */
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.25s ease;
+}
+.fade-enter-from, .fade-leave-to {
+  opacity: 0;
+}
+
+/* ========== Markdown 渲染样式 ========== */
+.markdown-body {
+  word-break: break-word;
+}
+
+.markdown-body p {
+  margin: 0;
+}
+.markdown-body p + p,
+.markdown-body p + ul,
+.markdown-body p + ol,
+.markdown-body p + pre,
+.markdown-body p + blockquote,
+.markdown-body ul + p,
+.markdown-body ol + p {
+  margin-top: 0.7em;
+}
+
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4 {
+  margin-top: 0.8em;
+  margin-bottom: 0.4em;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.35;
+}
+.markdown-body h1 { font-size: 1.35em; }
+.markdown-body h2 { font-size: 1.2em; }
+.markdown-body h3 { font-size: 1.1em; }
+.markdown-body h4 { font-size: 1em; }
+
+.markdown-body code:not(.hljs) {
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.9em;
+  background: var(--code-bg);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: var(--accent);
+}
+
+.markdown-body ul, .markdown-body ol {
+  padding-left: 1.4em;
+  margin: 6px 0;
+}
+.markdown-body li + li {
+  margin-top: 4px;
+}
+.markdown-body li::marker {
+  color: var(--accent);
+}
+
+.markdown-body blockquote {
+  border-left: 3px solid var(--accent-light);
+  padding-left: 12px;
+  color: var(--text-secondary);
+  margin: 10px 0;
+}
+
+.markdown-body a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-color: var(--accent-light);
+  text-underline-offset: 3px;
+}
+
+.markdown-body strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.markdown-body hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 12px 0;
+}
+
+.markdown-body table {
+  border-collapse: collapse;
+  margin: 10px 0;
+  width: 100%;
+  font-size: 0.95em;
+}
+.markdown-body th, .markdown-body td {
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+  text-align: left;
+}
+.markdown-body th {
+  background: var(--bg-tertiary);
+  font-weight: 600;
+}
+
+/* ========== 代码块（marked 自定义 renderer 输出） ========== */
+.markdown-body .code-block {
+  background: var(--code-bg);
+  border-radius: 8px;
+  margin: 10px 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  padding: 0 !important; /* 覆盖浏览器默认 pre 内边距 */
+}
+.markdown-body .code-head {
+  background: var(--code-head);
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.markdown-body .code-lang {
+  font-size: 11px;
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.markdown-body .code-block code.hljs {
+  display: block;
+  padding: 12px 14px;
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.55;
+  overflow-x: auto;
+  background: transparent;
+  color: var(--code-text);
+}
+
+/* ========== highlight.js 配色（主题适配） ========== */
+/* 浅色主题：柔和暖色 */
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-built_in,
+.hljs-name,
+.hljs-tag { color: #b9585e; }
+
+.hljs-string,
+.hljs-title,
+.hljs-section,
+.hljs-attribute,
+.hljs-literal,
+.hljs-template-tag,
+.hljs-template-variable,
+.hljs-type,
+.hljs-addition { color: #7a9058; }
+
+.hljs-comment,
+.hljs-quote,
+.hljs-deletion,
+.hljs-meta { color: #9a948d; font-style: italic; }
+
+.hljs-number,
+.hljs-regexp,
+.hljs-variable,
+.hljs-attr { color: #c58a4a; }
+
+.hljs-symbol,
+.hljs-bullet,
+.hljs-link { color: #8a6d9a; }
+
+/* 深色主题下覆盖 */
+[data-theme="dark"] .hljs-keyword,
+[data-theme="dark"] .hljs-selector-tag,
+[data-theme="dark"] .hljs-built_in,
+[data-theme="dark"] .hljs-name,
+[data-theme="dark"] .hljs-tag { color: #e6917c; }
+[data-theme="dark"] .hljs-string,
+[data-theme="dark"] .hljs-title,
+[data-theme="dark"] .hljs-section,
+[data-theme="dark"] .hljs-attribute,
+[data-theme="dark"] .hljs-literal,
+[data-theme="dark"] .hljs-type,
+[data-theme="dark"] .hljs-addition { color: #b0c27a; }
+[data-theme="dark"] .hljs-comment,
+[data-theme="dark"] .hljs-quote,
+[data-theme="dark"] .hljs-deletion,
+[data-theme="dark"] .hljs-meta { color: #78716b; }
+[data-theme="dark"] .hljs-number,
+[data-theme="dark"] .hljs-regexp,
+[data-theme="dark"] .hljs-variable,
+[data-theme="dark"] .hljs-attr { color: #e3b87c; }
+
+/* ========== 滚动条 ========== */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--accent-light);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ========== vue-virtual-scroller 样式修正 ========== */
+/* 虚拟列表的 wrapper 不要限制高度 */
+.vue-recycle-scroller__item-wrapper {
+  min-height: 1px;
+}
