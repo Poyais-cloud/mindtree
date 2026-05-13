@@ -1,10 +1,4 @@
 <script setup>
-/**
- * 主聊天视图
- *
- * 组装层：只负责布局和把各组件的事件串起来。
- * 业务逻辑都在 useChat composable 里，这里只调用它。
- */
 import { ref, computed } from 'vue'
 import { useChatStore } from '@/stores/chat'
 import { useChat } from '@/composables/useChat'
@@ -12,15 +6,16 @@ import SessionSidebar from '@/components/SessionSidebar.vue'
 import MessageList from '@/components/MessageList.vue'
 import MessageInput from '@/components/MessageInput.vue'
 import TopicPrompts from '@/components/TopicPrompts.vue'
+import CrisisNotice from '@/components/CrisisNotice.vue'
+import { analyzeCrisisText } from '@/utils/crisis'
 
 const store = useChatStore()
 const { error, sendMessage, stopGenerating } = useChat()
 
-// 侧边栏折叠状态（移动端默认收起）
 const sidebarCollapsed = ref(window.innerWidth < 768)
 
-// 话题模板 → 输入框回填
 const prefill = ref('')
+const crisis = ref(null)
 
 function handleTopicSelect(text) {
   prefill.value = text
@@ -28,25 +23,23 @@ function handleTopicSelect(text) {
 
 function handleSend(text) {
   prefill.value = ''
+  crisis.value = analyzeCrisisText(text)
   sendMessage(text)
 }
 
-// 当前激活会话标题
 const activeTitle = computed(() => {
   const s = store.sessions.get(store.activeId)
-  return s?.title || '心灵树洞'
+  return s?.title || '智语心聊'
 })
 </script>
 
 <template>
   <div class="chat-layout">
-    <!-- 侧边栏 -->
     <SessionSidebar
       :collapsed="sidebarCollapsed"
       @toggle="sidebarCollapsed = !sidebarCollapsed"
     />
 
-    <!-- 移动端遮罩 -->
     <transition name="fade">
       <div
         v-if="!sidebarCollapsed"
@@ -55,9 +48,7 @@ const activeTitle = computed(() => {
       />
     </transition>
 
-    <!-- 主内容区 -->
     <main class="main">
-      <!-- 顶部标题栏 -->
       <header class="main__head">
         <button
           v-if="sidebarCollapsed"
@@ -73,21 +64,24 @@ const activeTitle = computed(() => {
         <div class="main__head-spacer" />
       </header>
 
-      <!-- 消息列表 -->
       <MessageList />
 
-      <!-- 错误提示 -->
       <transition name="fade">
         <div v-if="error" class="error-bar">
-          <span>⚠️ {{ error }}</span>
+          <span>{{ error }}</span>
           <button @click="error = null">×</button>
         </div>
       </transition>
 
-      <!-- 话题引导（仅在空会话时出现） -->
+      <CrisisNotice
+        :visible="!!crisis"
+        :level="crisis?.level"
+        :keyword="crisis?.keyword"
+        @close="crisis = null"
+      />
+
       <TopicPrompts @select="handleTopicSelect" />
 
-      <!-- 输入框 -->
       <MessageInput
         :prefill="prefill"
         @send="handleSend"

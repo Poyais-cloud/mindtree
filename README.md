@@ -1,228 +1,160 @@
-# 智语心聊· MindTree
+# 智语心聊 MindTree
 
-> 基于大语言模型的智能心理对话研究系统。面向情绪健康场景，支持多轮上下文、流式输出、语音输入和历史对话回溯。
+智语心聊，是一个面向情绪记录和支持性对话的项目。项目采用前后端分离结构，前端负责会话管理、流式渲染、Markdown 安全渲染和语音输入，后端负责模型接口代理、系统提示词注入和流式响应转发。
 
-![Vue](https://img.shields.io/badge/Vue-3.4-42b883) ![Vite](https://img.shields.io/badge/Vite-5-646CFF) ![Pinia](https://img.shields.io/badge/Pinia-2-FFD859) ![Node](https://img.shields.io/badge/Node-18%2B-339933)
+本项目不提供心理诊断，也不能替代专业心理咨询或医疗服务。
 
----
+## 技术栈
 
-## 一、项目定位
+| 模块 | 技术 |
+| --- | --- |
+| 前端 | Vue 3, Vite, Vue Router, Pinia |
+| 后端 | Node.js 原生 http/https 模块 |
+| 状态 | Pinia, localStorage |
+| 流式响应 | fetch ReadableStream, SSE 文本协议 |
+| 内容渲染 | marked, DOMPurify, highlight.js |
+| 长列表 | vue-virtual-scroller |
+| 语音输入 | Web Speech API |
+| 模型接口 | 讯飞星火 MaaS OpenAI 兼容接口 |
 
-本项目面向心理健康场景，构建一个智能对话研究系统，探索大语言模型在情绪陪伴和心理干预中的应用潜力：
+## 功能范围
 
-- 后端注入专业心理陪伴 **System Prompt**（倾听优先、不做诊断、危机干预）
-- 针对情绪场景设计 **话题引导模板**，降低用户开口门槛
-- 3 套主题风格（温暖米 / 深色夜间 / 清晨蓝），适配不同使用氛围
-- 支持**语音输入**，适合移动端或不便打字的场景
-- 带有医疗免责声明和求助热线引导
+- 多会话创建、切换、重命名和删除
+- 会话内容本地持久化
+- 大模型流式回复
+- 用户主动停止生成
+- Markdown 渲染和代码块高亮
+- AI 输出内容 XSS 过滤
+- 长对话虚拟列表渲染
+- 底部跟随滚动控制
+- 语音输入和中间结果预览
+- 危机表达检测和求助提示
+- 浅色、深色、冷色三套主题
 
----
+## 实现说明
 
-## 二、技术栈
+### 流式对话
 
-| 层       | 技术                                                               |
-| -------- | ------------------------------------------------------------------ |
-| 前端框架 | Vue 3 (Composition API +`<script setup>`)                        |
-| 状态管理 | Pinia（`Map` 管理多会话，独立 preferences store 管主题）         |
-| 构建工具 | Vite 5（路由懒加载 + 按需分包）                                    |
-| 路由     | Vue Router 4 + Suspense 异步边界                                   |
-| 长列表   | **vue-virtual-scroller（DynamicScroller 动态高度虚拟列表）** |
-| Markdown | marked + DOMPurify（XSS 防护）                                     |
-| 代码高亮 | **highlight.js**（按需注册语言，避免 500KB 全量引入）        |
-| 语音识别 | **Web Speech API**（低延迟、浏览器原生）                     |
-| 后端     | 原生 Node.js（零依赖除 dotenv）                                    |
-| 模型接入 | 讯飞星火 MaaS（OpenAI 兼容接口）                                   |
-| 通信协议 | SSE（Server-Sent Events）流式传输                                  |
+前端在 `src/api/chat.js` 中使用 `fetch` 请求后端 `/api/chat`。响应体通过 `response.body.getReader()` 逐块读取，使用 `TextDecoder` 解码二进制内容，并按 SSE 的空行分隔规则解析 `data:` 行。
 
----
+模型返回的增量文本会先进入 `useChat.js` 内部的 buffer，再通过 50ms 节流写入 Pinia store，避免每个 token 都触发一次响应式更新。
 
-## 三、项目简介
+### 中断生成
 
-### 1. 流式数据实时渲染与性能优化
+前端为每次请求创建 `AbortController`，点击停止按钮时调用 `abort()`。后端监听响应对象的 `close` 事件，在客户端断开后销毁上游模型请求，避免继续消耗资源。
 
-- `fetch + ReadableStream + TextDecoder` 手动解析 SSE 协议
-- `buffer` 缓冲跨 chunk 不完整行（中文字符跨块边界）
-- `decoder.decode(value, { stream: true })` 避免中文乱码
-- 节流 50ms 批量 flush，减少 DOM diff 次数，流式更新从"每 token 一次渲染"降到"每 50ms 一次"
+### 会话状态
 
-### 2. AbortController 实现"停止生成"
+`src/stores/chat.js` 使用 `Map<sessionId, Session>` 管理会话。Map 适合按 id 查询、删除和保持插入顺序。由于 Map 不能直接 JSON 序列化，写入 localStorage 前会转成数组结构。
 
-- 前端持有 `AbortController`，点击停止按钮 `.abort()`
-- 后端监听 `res.on('close')` 同步销毁对上游 LLM 的请求
-- 避免用户已走、后端还在烧 token 的资源浪费
+### Markdown 安全渲染
 
-### 3. 虚拟列表（长对话性能优化）
+AI 回复通过 marked 转为 HTML，再经过 DOMPurify 白名单过滤后使用 `v-html` 渲染。代码块使用 highlight.js 高亮，并按需注册常见语言，避免引入完整语言包。
 
-- 用 `vue-virtual-scroller` 的 `DynamicScroller` 渲染历史消息
-- DOM 节点从 O(N) 降到 O(V)（V = 视口 + 缓冲区常数）
-- `size-dependencies` 属性解决流式追加导致高度变化的测量问题
-- 方案对比：**全量 v-for vs 分页 vs 虚拟列表**，各有取舍（README 九节详细讲）
+### 危机表达检测
 
-### 4. 语音输入（Web Speech API）
+前端在 `src/utils/crisis.js` 中对用户输入做本地关键词匹配。命中后，`CrisisNotice.vue` 展示安全提醒和求助入口。后端也会检测最近一条用户消息，命中时额外注入安全回应提示词，要求模型优先确认用户安全，不提供危险细节。
 
-- 浏览器原生识别，延迟 < 200ms，边说边出文字
-- `interimResults` 中间结果 + `continuous` 连续识别
-- 错误分类处理：权限拒绝 / 无语音 / 麦克风缺失 / 网络错
-- 降级：不支持的浏览器（如 Firefox）隐藏语音按钮而不是报错
+这部分只是风险提示和安全边界控制，不能替代专业干预。
 
-### 5. 智能滚动跟随
+### 长列表渲染
 
-- 判断用户是否"粘在底部"（阈值 80px），只在跟随态自动滚
-- 用户上翻历史时锁定滚动位置，不会被强拉回底部
-- 这是流式对话里最容易被面试官挑刺的细节
+消息列表使用 vue-virtual-scroller 的 `DynamicScroller`。对于流式追加导致的高度变化，组件通过 `size-dependencies` 让当前项重新测量高度。滚动控制只在用户接近底部时自动跟随，避免用户查看历史消息时被拉回底部。
 
-### 6. Map 管理多会话 + 防抖持久化
+### 语音输入
 
-- 查询/删除 O(1)，保留插入顺序，天然适合会话场景
-- 方案对比：数组 O(n) 查找、对象字典无序、**Map 全面胜出**
-- 持久化用 debounce 500ms 批量写 localStorage，避免频繁序列化
+语音输入基于浏览器 Web Speech API。Chrome 和 Edge 支持较好，其他浏览器不支持时会隐藏语音入口或给出错误提示。最终识别结果写入输入框，中间结果单独展示。
 
-### 7. Markdown 渲染的两个隐藏 bug 修复
+## 目录结构
 
-- **Bug A**：LLM 有时把整个回复包在 ` ```markdown ... ``` ` 里，
-  导致 `**` 和 `#` 显示为字面量字符 —— 预处理剥离外层 fence 修复
-- **Bug B**：流式到一半时，开 `` ``` `` 已到但闭合未到，
-  后续内容全部被当成代码块 —— 虚拟补一个闭合 ``` 修复
-- 详见 `src/utils/markdown.js`（面试时可以特意讲这个"别人想不到的坑"）
-
-### 8. 主题切换（CSS 变量）
-
-- 3 套配色：温暖米（默认）/ 深色夜间 / 清晨蓝
-- 方案：`<html data-theme="x">` + CSS 变量，纯 CSS 无运行时开销
-- 独立 preferences store 管理，自动持久化到 localStorage
-
-### 9. XSS 防护
-
-- AI 输出虽然"理论不是用户输入"，但可能被**提示词注入**诱导返回 XSS payload
-- DOMPurify 白名单策略：剥离 `on*` 事件、`<script>`、`<iframe>`
-- 允许 `class` 属性（不然 hljs 高亮会失效），但禁止内联样式
-
-### 10. 中文输入法兼容
-
-- textarea 用 `compositionstart/end` 标志位
-- 输入法组合中按 Enter 不触发发送 —— 中文产品必做细节
-
-### 11. defineAsyncComponent + Suspense
-
-- 路由懒加载（`() => import()`）+ Suspense `#fallback` 过渡
-- 避免路由切换时的白屏瞬间，用 loading spinner 填充
-
----
-
-## 四、目录结构
-
-```
+```text
 mindtree/
-├── mindtree-backend/              # 后端：单文件 Node 服务
-│   ├── index.js                    # 入口 + 路由 + SSE 转发 + System Prompt
+├── mindtree-backend/
+│   ├── index.js
 │   ├── package.json
 │   └── .env.example
-│
-└── mindtree-frontend/             # 前端：Vue 3 + Vite
-    ├── index.html
-    ├── vite.config.js
-    ├── package.json
-    └── src/
-        ├── main.js                 # 应用入口
-        ├── App.vue                 # 根组件（Suspense 边界）
-        ├── router/                 # 路由（懒加载）
-        ├── api/
-        │   └── chat.js             # SSE 流式请求核心
-        ├── stores/
-        │   ├── chat.js             # Pinia 多会话 Store（Map 结构）
-        │   └── preferences.js      # 主题等偏好
-        ├── composables/
-        │   ├── useChat.js          # 对话业务逻辑封装
-        │   ├── useAutoScroll.js    # 智能滚动跟随
-        │   └── useSpeechRecognition.js  # 语音识别封装
-        ├── utils/
-        │   ├── throttle.js         # 节流实现
-        │   └── markdown.js         # Markdown + 高亮 + XSS 防护
-        ├── components/
-        │   ├── SessionSidebar.vue  # 左侧会话栏 + 主题切换
-        │   ├── MessageList.vue     # 虚拟列表（DynamicScroller）
-        │   ├── MessageItem.vue     # 单条消息气泡
-        │   ├── MessageInput.vue    # 输入框（含语音按钮）
-        │   └── TopicPrompts.vue    # 话题引导
-        ├── views/
-        │   ├── ChatView.vue        # 主对话视图
-        │   └── AboutView.vue       # 关于页
-        └── assets/
-            └── main.css            # 全局样式 + 3 套主题变量
+├── mindtree-frontend/
+│   ├── index.html
+│   ├── vite.config.js
+│   ├── package.json
+│   └── src/
+│       ├── api/
+│       ├── assets/
+│       ├── components/
+│       ├── composables/
+│       ├── router/
+│       ├── stores/
+│       ├── utils/
+│       └── views/
+└── docs/
+    └── interview-prep.md
 ```
 
----
+## 本地运行
 
-## 五、本地运行
-
-### 0. 申请 API Key
-
-访问 [讯飞 MaaS 控制台](https://training.xfyun.cn/modelService) → 注册 → 实名认证 → 创建应用 → 复制 APIKey 和 APISecret，用 `:` 拼成 `APIKey:APISecret`。
-
-也可以用任何 OpenAI 兼容接口（DeepSeek / Moonshot / OpenRouter 等），改 `mindtree-backend/index.js` 里的 `hostname`、`path`、`MODEL`。
-
-### 1. 启动后端
+### 后端
 
 ```bash
 cd mindtree-backend
 npm install
 cp .env.example .env
-# 编辑 .env 填入 API Key
-npm run dev
+npm start
 ```
 
-### 2. 启动前端
+`.env` 中需要配置：
 
-**另开一个终端：**
+```bash
+XUNFEI_API_KEY=your_api_key
+PORT=3000
+MODEL=xop3qwen1b7
+CORS_ORIGIN=*
+MAX_BODY_BYTES=1048576
+```
+
+### 前端
 
 ```bash
 cd mindtree-frontend
 npm install
+cp .env.example .env.local
 npm run dev
 ```
 
-访问 [http://localhost:5173](http://localhost:5173)
+开发环境默认通过 Vite proxy 请求 `http://localhost:3000`。如果后端部署在其他地址，在 `.env.local` 中配置：
 
-### 3. 体验各项功能
+```bash
+VITE_API_BASE_URL=https://your-backend-domain.com
+```
 
-- **语音输入**：点击输入框右侧的 🎙 按钮（需 Chrome/Edge + 授权麦克风）
-- **主题切换**：左下角 🌿 / 🌙 / ☀️ 按钮
-- **多会话**：左上"开启新对话"
-- **停止生成**：AI 回答中点击右下角停止按钮
-- **虚拟列表效果**：连续发 100+ 条消息，滚动依然流畅
+## 构建
 
----
+```bash
+cd mindtree-frontend
+npm run build
+```
 
-## 六、智能心理对话研究系统（MindTree）
+后端语法检查：
 
-> 基于大语言模型的智能心理陪伴对话研究系统，支持多轮上下文管理、流式输出、语音输入及历史对话回溯。探索自然语言交互在心理健康服务中的应用潜力。
->
-> **技术栈**：Vue 3 · Vite · Pinia · Vue Router · SSE · Web Speech API · highlight.js · vue-virtual-scroller
->
-> **主要工作**：
->
-> - 搭建 Vue 3 + Vite 模块化工程，采用组合式 API 将对话业务（`useChat`）、滚动控制（`useAutoScroll`）、语音识别（`useSpeechRecognition`）拆分为独立 composable，实现业务解耦与高复用
-> - 封装 LLM API 模块，基于 `fetch + ReadableStream + TextDecoder` 手动解析 SSE，结合 50ms 节流批量更新和 `AbortController` 中断机制，实现稳定的流式对话体验；修复了 LLM 偶发将回复裹在代码块内导致 Markdown 渲染失效的隐藏问题
-> - 基于 Pinia + `Map<sessionId, Session>` 构建多会话管理，配合 localStorage 防抖持久化，实现会话切换、重命名、删除的 O(1) 操作和崩溃恢复
-> - 集成 vue-virtual-scroller 的 DynamicScroller 实现动态高度虚拟列表，通过 `size-dependencies` 解决流式追加时的高度测量问题，百条消息场景下 DOM 节点数保持在几十个以内，滚动稳定 60 FPS
-> - 基于 Web Speech API 封装语音输入模块，实现低延迟的实时转写、中间结果预览、权限与网络错误分类处理，对比了 MediaRecorder + 后端 ASR 方案，综合延迟和部署成本选型
-> - 使用 marked + DOMPurify 构建安全 Markdown 渲染管线，配合 highlight.js 按需注册语言实现代码高亮，通过白名单策略防御提示词注入导致的 XSS 风险
-> - 基于 CSS 变量 + `[data-theme]` 属性选择器实现 3 套主题切换，纯 CSS 无运行时开销；结合 `defineAsyncComponent + Suspense` 优化路由切换体验
+```bash
+cd mindtree-backend
+node --check index.js
+```
 
-## 七、后续可做的改进
+## 项目边界
 
-- [ ] 情绪打分 + 周趋势图（Chart.js）
-- [ ] 危机词本地匹配，命中后主动弹出求助资源
-- [ ] 长会话上下文摘要压缩（滑动窗口 / 累进式摘要）
-- [ ] PWA 离线支持
+- 当前版本没有用户账号系统。
+- 会话主要保存在浏览器 localStorage。
+- 后端没有数据库持久化。
+- 危机识别是规则匹配，不是医学判断。
+- 模型回复质量取决于上游模型能力和提示词约束。
 
----
+## 可继续改进
 
-## 八、免责声明
-
-⚠ 本项目是一个情绪陪伴的研究 Demo，**不能替代**专业心理咨询或精神科医疗。
-
----
+- 后端接入数据库保存会话
+- 增加用户登录和鉴权
+- 增加长会话摘要压缩
+- 增加情绪评分和趋势图
+- 增加部署脚本和线上环境配置说明
 
 ## License
 

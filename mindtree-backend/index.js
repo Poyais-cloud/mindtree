@@ -7,10 +7,10 @@ dotenv.config()
 const API_KEY = process.env.XUNFEI_API_KEY
 const PORT = process.env.PORT || 3000
 const MODEL = process.env.MODEL || 'xop3qwen1b7'
+const CORS_ORIGIN = process.env.CORS_ORIGIN || '*'
+const MAX_BODY_BYTES = Number(process.env.MAX_BODY_BYTES) || 1024 * 1024
 
-// ========== 心理对话的灵魂：System Prompt ==========
-// 这段是让"套壳"变成"心理对话应用"的关键
-const PSYCHOLOGY_SYSTEM_PROMPT = `你是"心灵树洞"，一位专业、温柔、富有共情力的心理陪伴助手。
+const PSYCHOLOGY_SYSTEM_PROMPT = `你是"智语心聊",英文名 MindTree,一个情绪支持对话助手。
 你遵循以下原则与用户对话：
 
 1. 【倾听优先】你不是问题的解决者，而是情绪的陪伴者。用户的感受永远比道理重要。
@@ -20,38 +20,89 @@ const PSYCHOLOGY_SYSTEM_PROMPT = `你是"心灵树洞"，一位专业、温柔�
 5. 【危机干预】如果用户表达出自伤、自杀或严重危机的信号,温柔地提醒专业求助渠道
 6. 【语言风格】自然、口语化、有温度,避免说教。回应一般在 80-200 字之间,不要太长。
 7. 【边界】如果用户问的不是情感类问题(比如让你写代码、做作业),温柔地引导回对话的初衷。
-8. 【格式规范】当用户需要结构化建议时,可以直接用 Markdown 语法(# 标题、**加粗**、- 列表 等),但【绝对不要】把整个回复包在 \`\`\`markdown ... \`\`\` 代码块里 —— 用户的前端会直接把 Markdown 渲染成富文本,包代码块反而会让格式失效。代码块只用于真正展示代码片段。
+8. 【格式规范】当用户需要结构化建议时,可以直接使用 Markdown,不要把完整回复包在代码块里。代码块只用于真正展示代码片段。
 
-请始终以"心灵树洞"的身份回应,第一人称用"我"。`
+请始终以"智语心聊 MindTree"的身份回应,第一人称用"我"。`
 
-// ========== 话题模板:让用户有引导地开始对话 ==========
+const CRISIS_RESPONSE_PROMPT = `重要安全提醒：用户刚才的表达中可能出现自伤、自杀或严重危机信号。
+你的回复必须优先处理安全：
+1. 先温柔确认对方此刻的安全状态。
+2. 明确建议用户立刻联系身边可信的人,不要独自承受。
+3. 如果存在即时危险,建议马上拨打当地紧急电话或心理危机热线。
+4. 不要给出任何自伤方法、危险步骤或细节。
+5. 语气要短、稳、具体,不要说教。`
+
+const CRISIS_PATTERNS = [
+  /自杀|轻生|结束生命|不想活|活不下去|想死|去死|跳楼|割腕/,
+  /吞药|服药自杀|上吊|煤气自杀|伤害自己|自残/,
+  /撑不下去|没有意义|没人需要我|消失算了|好绝望|彻底崩溃/,
+]
+
 const TOPIC_PROMPTS = {
-  'daily': '今天过得怎么样?有什么想和我分享的吗?',
-  'stress': '最近是不是压力有点大?可以和我说说是什么让你这样感觉的。',
-  'relationship': '人际关系上有什么让你困扰的吗?我在这里听。',
-  'anxiety': '有什么事情让你焦虑不安吗?慢慢说,我们一起理一理。',
-  'sleep': '睡眠最近怎么样?有什么在心里放不下吗?',
+  'daily': '记录一下今天的状态,包括让你感到轻松或消耗的事情。',
+  'stress': '描述最近主要的压力来源,以及它对你生活的影响。',
+  'relationship': '说说最近让你困扰的人际关系或沟通场景。',
+  'anxiety': '写下让你焦虑的事情,以及你最担心的结果。',
+  'sleep': '记录最近的睡眠情况,以及睡前反复想到的内容。',
 }
 
-// ========== CORS 通用处理 ==========
 function setCors(res) {
-  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Origin', CORS_ORIGIN)
   res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
 }
 
-// ========== 把 System Prompt 注入到消息序列最前面 ==========
-// 关键点:前端不需要知道这个 Prompt 的存在,后端统一注入
+function sendJson(res, statusCode, data) {
+  res.statusCode = statusCode
+  res.setHeader('Content-Type', 'application/json; charset=utf-8')
+  res.end(JSON.stringify(data))
+}
+
 function injectSystemPrompt(messages) {
-  // 如果第一条已经是 system 消息,就替换掉(防止前端乱传)
   const filtered = messages.filter(m => m.role !== 'system')
-  return [
+  const injected = [
     { role: 'system', content: PSYCHOLOGY_SYSTEM_PROMPT },
     ...filtered,
   ]
+
+  if (hasCrisisSignal(filtered)) {
+    injected.splice(1, 0, { role: 'system', content: CRISIS_RESPONSE_PROMPT })
+  }
+
+  return injected
 }
 
-// ========== 工具:往 SSE 流里写一条错误消息 ==========
+function hasCrisisSignal(messages) {
+  const lastUserMessage = [...messages].reverse().find(m => m.role === 'user')
+  if (!lastUserMessage) return false
+  return CRISIS_PATTERNS.some(pattern => pattern.test(lastUserMessage.content))
+}
+
+function validateMessages(messages) {
+  if (!Array.isArray(messages) || messages.length === 0) {
+    return '消息列表不能为空'
+  }
+
+  if (messages.length > 50) {
+    return '消息数量过多,请开启新对话后重试'
+  }
+
+  const validRoles = new Set(['user', 'assistant'])
+  for (const message of messages) {
+    if (!message || !validRoles.has(message.role)) {
+      return '消息角色不合法'
+    }
+    if (typeof message.content !== 'string' || !message.content.trim()) {
+      return '消息内容不能为空'
+    }
+    if (message.content.length > 8000) {
+      return '单条消息过长,请缩短后重试'
+    }
+  }
+
+  return null
+}
+
 function writeSSEError(res, errorMsg) {
   res.setHeader('Content-Type', 'text/event-stream')
   res.setHeader('Cache-Control', 'no-cache')
@@ -60,7 +111,6 @@ function writeSSEError(res, errorMsg) {
   res.end()
 }
 
-// ========== 核心:调用讯飞 LLM 并把流转发给前端 ==========
 function handleStreamRequest(messages, res) {
   const injectedMessages = injectSystemPrompt(messages)
 
@@ -68,7 +118,7 @@ function handleStreamRequest(messages, res) {
     model: MODEL,
     messages: injectedMessages,
     max_tokens: 2000,
-    temperature: 0.8, // 心理对话要有点温度,不能太死板
+    temperature: 0.8,
     stream: true,
   }
 
@@ -98,18 +148,14 @@ function handleStreamRequest(messages, res) {
       return
     }
 
-    // 设置 SSE 响应头 —— 这是让前端能流式接收的关键
     res.setHeader('Content-Type', 'text/event-stream')
     res.setHeader('Cache-Control', 'no-cache')
     res.setHeader('Connection', 'keep-alive')
-    res.setHeader('X-Accel-Buffering', 'no') // 关闭 Nginx 缓冲,防止 Nginx 攒批发送
+    res.setHeader('X-Accel-Buffering', 'no')
+    res.flushHeaders?.()
 
-    // 核心一行:把上游流直接 pipe 给客户端
-    // 这样讯飞每吐一个 token,前端就能立刻收到,零延迟
     upstreamRes.pipe(res)
 
-    // 客户端主动断开时(比如点了"停止生成"),我们也要终止上游请求
-    // 这一步能避免"用户已走,后端还在烧钱调 LLM"
     res.on('close', () => {
       if (!upstreamRes.complete) {
         console.log('[客户端断开] 终止上游请求')
@@ -133,7 +179,6 @@ function handleStreamRequest(messages, res) {
   upstreamReq.end()
 }
 
-// ========== HTTP 路由 ==========
 const server = http.createServer((req, res) => {
   setCors(res)
 
@@ -142,32 +187,41 @@ const server = http.createServer((req, res) => {
     return res.end()
   }
 
-  // 健康检查
   if (req.method === 'GET' && req.url === '/health') {
-    res.setHeader('Content-Type', 'application/json')
-    return res.end(JSON.stringify({ status: 'ok', model: MODEL }))
+    return sendJson(res, 200, { status: 'ok', model: MODEL })
   }
 
-  // 获取话题模板列表
   if (req.method === 'GET' && req.url === '/api/topics') {
-    res.setHeader('Content-Type', 'application/json')
-    return res.end(JSON.stringify(TOPIC_PROMPTS))
+    return sendJson(res, 200, TOPIC_PROMPTS)
   }
 
-  // 核心对话接口
   if (req.method === 'POST' && req.url === '/api/chat') {
     if (!API_KEY) {
       return writeSSEError(res, '服务器未配置 API Key')
     }
 
     let body = ''
-    req.on('data', chunk => { body += chunk })
+    let receivedBytes = 0
+    let bodyTooLarge = false
+
+    req.on('data', chunk => {
+      receivedBytes += chunk.length
+      if (receivedBytes > MAX_BODY_BYTES) {
+        bodyTooLarge = true
+        res.statusCode = 413
+        writeSSEError(res, '请求内容过大')
+        req.destroy()
+        return
+      }
+      body += chunk
+    })
+
     req.on('end', () => {
+      if (bodyTooLarge) return
       try {
         const { messages } = JSON.parse(body)
-        if (!Array.isArray(messages) || messages.length === 0) {
-          return writeSSEError(res, '消息列表不能为空')
-        }
+        const validationError = validateMessages(messages)
+        if (validationError) return writeSSEError(res, validationError)
         handleStreamRequest(messages, res)
       } catch (err) {
         writeSSEError(res, '请求格式错误')
@@ -181,7 +235,7 @@ const server = http.createServer((req, res) => {
 })
 
 server.listen(PORT, () => {
-  console.log(`[心灵树洞后端] http://localhost:${PORT}`)
+  console.log(`[智语心聊 MindTree 后端] http://localhost:${PORT}`)
   console.log(`[模型] ${MODEL}`)
-  console.log(`[API Key] ${API_KEY ? '已配置' : '⚠️  未配置,请检查 .env'}`)
+  console.log(`[API Key] ${API_KEY ? '已配置' : '未配置,请检查 .env'}`)
 })

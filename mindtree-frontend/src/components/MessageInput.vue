@@ -1,16 +1,4 @@
 <script setup>
-/**
- * 输入区组件 
- * - 语音输入（Web Speech API）—— mic 按钮长按 / 点击切换
- * - 录音中状态指示（脉冲动画 + 实时转写预览）
- * - 错误提示（权限拒绝、不支持等）
- *
- * 保留的交互要点:
- * 1. textarea 自适应高度
- * 2. Enter 发送 / Shift+Enter 换行
- * 3. 输入法 composition 处理（中文产品关键细节）
- * 4. 生成中变停止按钮
- */
 import { ref, nextTick, watch, computed } from 'vue'
 import { useChatStore } from '@/stores/chat'
 import { useSpeechRecognition } from '@/composables/useSpeechRecognition'
@@ -24,7 +12,6 @@ const store = useChatStore()
 const text = ref('')
 const textareaRef = ref(null)
 
-// ========== 语音识别 ==========
 const {
   isSupported: speechSupported,
   isListening,
@@ -36,7 +23,6 @@ const {
   clear: clearSpeech,
 } = useSpeechRecognition({ lang: 'zh-CN' })
 
-// 语音识别出新的 final 结果时，追加到 textarea
 watch(transcript, (newTranscript, oldTranscript) => {
   const diff = newTranscript.slice(oldTranscript?.length || 0)
   if (diff) {
@@ -45,7 +31,6 @@ watch(transcript, (newTranscript, oldTranscript) => {
   }
 })
 
-// 展示用的完整值 = textarea 当前值 + 当前中间结果（灰色提示）
 const displayHint = computed(() => {
   if (isListening.value && interimTranscript.value) {
     return interimTranscript.value
@@ -66,7 +51,6 @@ function toggleSpeech() {
   }
 }
 
-// ========== 中文输入法处理 ==========
 let isComposing = false
 function onCompositionStart() { isComposing = true }
 function onCompositionEnd()   { isComposing = false }
@@ -112,38 +96,33 @@ function handleStop() { emit('stop') }
 
 <template>
   <div class="input-wrap">
-    <!-- 语音错误条 -->
     <transition name="fade">
       <div v-if="speechError" class="speech-err">
-        🎙 {{ speechError }}
+        {{ speechError }}
         <button @click="speechError = null">×</button>
       </div>
     </transition>
 
     <div class="input-box" :class="{ 'input-box--recording': isListening }">
-      <!-- 录音中的脉冲指示 -->
       <div v-if="isListening" class="rec-pulse" title="录音中">
         <span class="rec-dot" />
       </div>
 
-      <!-- 文本输入 + 中间结果悬浮提示 -->
       <div class="textarea-wrap">
         <textarea
           ref="textareaRef"
           v-model="text"
           class="input-textarea"
-          :placeholder="isListening ? '正在听你说…' : '把心里的话说出来吧…… (Enter 发送, Shift + Enter 换行)'"
+          :placeholder="isListening ? '正在识别语音' : '输入内容，Enter 发送，Shift + Enter 换行'"
           rows="1"
           :disabled="store.isGenerating"
           @keydown="handleKeydown"
           @compositionstart="onCompositionStart"
           @compositionend="onCompositionEnd"
         />
-        <!-- 实时中间结果（灰色提示） -->
         <div v-if="displayHint" class="interim">{{ displayHint }}</div>
       </div>
 
-      <!-- 麦克风按钮（仅在支持时显示） -->
       <button
         v-if="speechSupported && !store.isGenerating"
         class="btn-mic"
@@ -160,7 +139,6 @@ function handleStop() { emit('stop') }
         </svg>
       </button>
 
-      <!-- 发送 / 停止 -->
       <button
         v-if="store.isGenerating"
         class="btn-action btn-action--stop"
@@ -183,7 +161,7 @@ function handleStop() { emit('stop') }
     </div>
 
     <div class="input-hint">
-      此处对话仅供情绪陪伴，不构成医疗建议。如感到严重困扰，请联系专业人士。
+      本工具仅用于情绪支持和记录，不构成医疗建议。
     </div>
   </div>
 </template>

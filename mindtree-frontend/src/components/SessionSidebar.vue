@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { useChatStore } from '@/stores/chat'
 import { usePreferencesStore, THEMES } from '@/stores/preferences'
+import AppIcon from '@/components/AppIcon.vue'
 
 defineProps({
   collapsed: { type: Boolean, default: false },
@@ -63,14 +64,8 @@ function formatDate(ts) {
   <aside class="sidebar" :class="{ 'sidebar--collapsed': collapsed }">
     <div class="sidebar__head">
       <div class="logo">
-        <svg viewBox="0 0 32 32" width="24" height="24" aria-hidden="true">
-          <path d="M16 24 L16 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>
-          <circle cx="16" cy="12" r="5" fill="currentColor" opacity="0.85"/>
-          <circle cx="11" cy="14" r="3.5" fill="currentColor" opacity="0.6"/>
-          <circle cx="21" cy="14" r="3.5" fill="currentColor" opacity="0.6"/>
-          <circle cx="16" cy="9" r="3.5" fill="currentColor" opacity="0.4"/>
-        </svg>
-        <span class="logo__text">心灵树洞</span>
+        <AppIcon :size="24" />
+        <span class="logo__text">智语心聊</span>
       </div>
       <button class="icon-btn icon-btn--toggle" title="收起" @click="emit('toggle')">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
@@ -87,7 +82,7 @@ function formatDate(ts) {
       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
         <path d="M12 5 L12 19 M5 12 L19 12"/>
       </svg>
-      <span>开启新对话</span>
+      <span>新建会话</span>
     </button>
 
     <div class="list">
@@ -128,7 +123,6 @@ function formatDate(ts) {
       </div>
     </div>
 
-    <!-- 底部：主题切换 + 关于 -->
     <div class="sidebar__foot">
       <div class="theme-switcher" role="radiogroup" aria-label="主题切换">
         <button
@@ -139,11 +133,10 @@ function formatDate(ts) {
           :title="t.label"
           @click="prefs.setTheme(t.id)"
         >
-          <span class="theme-btn__emoji">{{ t.emoji }}</span>
           <span class="theme-btn__label">{{ t.label }}</span>
         </button>
       </div>
-      <router-link to="/about" class="foot-link">关于这里</router-link>
+      <router-link to="/about" class="foot-link">关于项目</router-link>
     </div>
   </aside>
 </template>
@@ -286,7 +279,6 @@ function formatDate(ts) {
   border: 1px solid var(--accent-light);
 }
 
-/* ========== 底部主题切换 ========== */
 .sidebar__foot {
   padding: 12px 14px;
   border-top: 1px solid var(--border);
@@ -316,7 +308,6 @@ function formatDate(ts) {
   font-size: 11px;
   font-weight: 500;
 }
-.theme-btn__emoji { font-size: 13px; }
 .theme-btn__label {
   white-space: nowrap;
 }
@@ -342,7 +333,6 @@ function formatDate(ts) {
 }
 .foot-link:hover { color: var(--accent); }
 
-/* 移动端：抽屉式 */
 @media (max-width: 768px) {
   .sidebar {
     position: fixed;

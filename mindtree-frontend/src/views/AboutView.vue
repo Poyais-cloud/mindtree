@@ -1,5 +1,6 @@
 <script setup>
 import { useRouter } from 'vue-router'
+
 const router = useRouter()
 </script>
 
@@ -21,34 +22,34 @@ const router = useRouter()
           <circle cx="21" cy="14" r="3.5" fill="#c2a783"/>
           <circle cx="16" cy="9" r="3.5" fill="#d9c7ae"/>
         </svg>
-        <h1>心灵树洞</h1>
-        <p class="subtitle">一个可以安心说出心事的地方</p>
+        <h1>智语心聊</h1>
+        <p class="subtitle">MindTree · 情绪记录与支持对话工具</p>
       </div>
 
       <section class="block">
-        <h2>这里是什么</h2>
+        <h2>项目定位</h2>
         <p>
-          心灵树洞是一个基于大语言模型的情绪陪伴对话空间。
-          它不提供诊断，也不替代专业心理咨询，
-          只是一个可以安静地、不被评判地倾诉的地方。
+          智语心聊，英文名 MindTree，是一个基于大语言模型的情绪支持对话工具。
+          它用于记录当前状态、梳理压力来源和获得基础陪伴式反馈，
+          不提供诊断，也不替代专业心理咨询或医疗服务。
         </p>
       </section>
 
       <section class="block">
-        <h2>和普通 AI 对话的区别</h2>
+        <h2>主要能力</h2>
         <ul>
-          <li>注入了专业的倾听原则：共情优先、不做诊断、不强行给建议</li>
-          <li>针对情绪场景设计的引导话题，降低开口门槛</li>
-          <li>遇到危机信号会温柔地提示专业求助渠道，不回避</li>
-          <li>对话在本地存储，不会上传，你可以随时删除</li>
+          <li>后端统一注入情绪支持类系统提示词</li>
+          <li>提供压力、人际、焦虑、睡眠等起始话题</li>
+          <li>检测明显危机表达并展示求助提示</li>
+          <li>会话记录保存在当前浏览器本地</li>
         </ul>
       </section>
 
       <section class="block block--warn">
-        <h2>⚠ 重要提醒</h2>
+        <h2>安全说明</h2>
         <p>
           如果你正在经历严重的情绪危机、自伤或自杀念头，
-          请不要只依赖这里，务必联系专业的帮助：
+          请不要只依赖本工具，优先联系身边可信的人或专业机构。
         </p>
         <div class="hotlines">
           <div class="hotline">

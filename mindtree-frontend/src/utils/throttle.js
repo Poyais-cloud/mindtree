@@ -1,6 +1,3 @@
-/**
- * 节流函数 —— 保证一段时间内最多执行一次
- */
 export function throttle(fn, wait = 50) {
   let lastCall = 0
   let timer = null

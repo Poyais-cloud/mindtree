@@ -1,10 +1,6 @@
-/**
- * useSpeechRecognition —— 浏览器原生语音识别封装
- */
 import { ref, onUnmounted } from 'vue'
 
 export function useSpeechRecognition({ lang = 'zh-CN' } = {}) {
-  // 浏览器兼容：Chrome/Edge 是 webkitSpeechRecognition，Firefox 不支持
   const SpeechRecognition =
     typeof window !== 'undefined' &&
     (window.SpeechRecognition || window.webkitSpeechRecognition)
@@ -12,8 +8,8 @@ export function useSpeechRecognition({ lang = 'zh-CN' } = {}) {
   const isSupported = !!SpeechRecognition
 
   const isListening = ref(false)
-  const transcript = ref('')        // 最终结果
-  const interimTranscript = ref('') // 中间（未确认）结果
+  const transcript = ref('')
+  const interimTranscript = ref('')
   const error = ref(null)
 
   let recognition = null
@@ -21,8 +17,8 @@ export function useSpeechRecognition({ lang = 'zh-CN' } = {}) {
   function createInstance() {
     const inst = new SpeechRecognition()
     inst.lang = lang
-    inst.continuous = true        // 持续识别，不要说一句就停
-    inst.interimResults = true    // 返回中间结果，打字机体验
+    inst.continuous = true
+    inst.interimResults = true
     inst.maxAlternatives = 1
 
     inst.onstart = () => {
@@ -33,7 +29,6 @@ export function useSpeechRecognition({ lang = 'zh-CN' } = {}) {
     inst.onresult = (event) => {
       let finalText = ''
       let interimText = ''
-      // event.results 是所有识别结果（累积的，从 resultIndex 开始是本轮新增的）
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const chunk = event.results[i][0].transcript
         if (event.results[i].isFinal) {
@@ -47,13 +42,12 @@ export function useSpeechRecognition({ lang = 'zh-CN' } = {}) {
     }
 
     inst.onerror = (event) => {
-      // 常见错误码处理
       const errMap = {
         'not-allowed': '麦克风权限被拒绝，请在浏览器设置中允许访问',
         'no-speech':   '没有检测到说话，再试一次？',
         'audio-capture': '找不到麦克风设备',
         'network':     '网络错误，语音识别暂不可用',
-        'aborted':     null, // 主动停止，不算错
+        'aborted':     null,
       }
       const msg = errMap[event.error]
       if (msg !== null) {
@@ -77,7 +71,6 @@ export function useSpeechRecognition({ lang = 'zh-CN' } = {}) {
     }
     if (isListening.value) return
 
-    // 每次重新创建实例，避免旧实例状态污染
     recognition = createInstance()
     transcript.value = ''
     interimTranscript.value = ''
@@ -86,7 +79,6 @@ export function useSpeechRecognition({ lang = 'zh-CN' } = {}) {
     try {
       recognition.start()
     } catch (err) {
-      // "already started" 等边界错误
       console.warn('[Speech] start 失败', err)
       error.value = '启动语音识别失败，请稍后重试'
     }
@@ -106,7 +98,6 @@ export function useSpeechRecognition({ lang = 'zh-CN' } = {}) {
     error.value = null
   }
 
-  // 组件卸载时清理，防止麦克风持续占用
   onUnmounted(() => {
     stop()
     recognition = null

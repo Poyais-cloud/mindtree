@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { renderMarkdown } from '@/utils/markdown'
+import AppIcon from '@/components/AppIcon.vue'
 
 const props = defineProps({
   message: { type: Object, required: true },
@@ -27,13 +28,7 @@ const showThinking = computed(() => {
   <div class="msg-row" :class="{ 'msg-row--user': isUser }">
     <!-- AI 头像 -->
     <div v-if="!isUser" class="avatar">
-      <svg viewBox="0 0 32 32" width="22" height="22" aria-hidden="true">
-        <path d="M16 24 L16 15" stroke="#8b7355" stroke-width="2" stroke-linecap="round" fill="none"/>
-        <circle cx="16" cy="12" r="5" fill="#a68b6e"/>
-        <circle cx="11" cy="14" r="3.5" fill="#c2a783"/>
-        <circle cx="21" cy="14" r="3.5" fill="#c2a783"/>
-        <circle cx="16" cy="9" r="3.5" fill="#d9c7ae"/>
-      </svg>
+      <AppIcon :size="22" />
     </div>
 
     <!-- 气泡 -->

@@ -1,14 +1,4 @@
 <script setup>
-/**
- * 话题引导组件
- *
- * 这是"场景化包装"的关键之一 —— 让用户一打开就知道可以聊什么，
- * 降低对话启动成本。普通 ChatGPT 套壳不会做这件事。
- *
- * 面试可以讲：
- * - 用户进入空白聊天框时的"冷启动"焦虑很常见
- * - 预设话题模板可以降低门槛，同时也暗示了产品边界（这是个情绪类产品）
- */
 import { onMounted, ref, computed } from 'vue'
 import { fetchTopics } from '@/api/chat'
 import { useChatStore } from '@/stores/chat'
@@ -18,16 +8,14 @@ const emit = defineEmits(['select'])
 const store = useChatStore()
 const topics = ref({})
 
-// 话题图标映射（emoji 作为视觉标识，不依赖图标库，轻量）
 const TOPIC_META = {
-  daily:        { icon: '🌿', label: '聊聊今天' },
-  stress:       { icon: '🫧', label: '最近压力大' },
-  relationship: { icon: '🤝', label: '人际困扰' },
-  anxiety:      { icon: '🌙', label: '莫名焦虑' },
-  sleep:        { icon: '🌸', label: '睡眠不好' },
+  daily:        { label: '今日状态' },
+  stress:       { label: '压力事件' },
+  relationship: { label: '人际关系' },
+  anxiety:      { label: '焦虑感受' },
+  sleep:        { label: '睡眠情况' },
 }
 
-// 仅在当前会话"几乎是空的"时显示（只有一条 AI 欢迎语）
 const shouldShow = computed(() => store.activeMessages.length <= 1)
 
 onMounted(async () => {
@@ -43,7 +31,7 @@ function handlePick(key) {
 <template>
   <transition name="fade">
     <div v-if="shouldShow && Object.keys(topics).length" class="topics">
-      <div class="topics__hint">不知道从哪说起？选一个话题吧</div>
+      <div class="topics__hint">选择一个起始话题</div>
       <div class="topics__list">
         <button
           v-for="(_, key) in topics"
@@ -51,7 +39,6 @@ function handlePick(key) {
           class="topic-chip"
           @click="handlePick(key)"
         >
-          <span class="topic-chip__icon">{{ TOPIC_META[key]?.icon || '💬' }}</span>
           <span>{{ TOPIC_META[key]?.label || key }}</span>
         </button>
       </div>
@@ -79,11 +66,10 @@ function handlePick(key) {
 .topic-chip {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 14px;
+  padding: 8px 12px;
   background: var(--bg-secondary);
   border: 1px solid var(--border);
-  border-radius: 20px;
+  border-radius: 6px;
   font-size: 14px;
   color: var(--text-secondary);
 }
@@ -92,9 +78,6 @@ function handlePick(key) {
   border-color: var(--accent-light);
   color: var(--text-primary);
   transform: translateY(-1px);
-}
-.topic-chip__icon {
-  font-size: 15px;
 }
 
 @media (max-width: 640px) {
