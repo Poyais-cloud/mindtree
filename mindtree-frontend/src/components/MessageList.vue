@@ -75,7 +75,7 @@ const MIN_ITEM_SIZE = 60
       <DynamicScrollerItem
         :item="item"
         :active="active"
-        :size-dependencies="[item.content]"
+        :size-dependencies="[item.content, item.tools?.length, item.citations?.length]"
         :data-index="index"
       >
         <div class="msg-slot">

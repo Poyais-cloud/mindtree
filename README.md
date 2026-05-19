@@ -1,43 +1,65 @@
-# 智语心聊 MindTree
+# MindTree · 智语心聊
 
-智语心聊，是一个面向情绪记录和支持性对话的项目。项目采用前后端分离结构，前端负责会话管理、流式渲染、Markdown 安全渲染和语音输入，后端负责模型接口代理、系统提示词注入和流式响应转发。
+一个情绪支持对话工具。可以和你聊天，也可以读你上传的资料，结合资料内容回复。
 
-本项目不提供心理诊断，也不能替代专业心理咨询或医疗服务。
+**注意：这不是心理诊断工具，不能替代专业咨询或医疗。**
+
+## 功能
+
+- 多会话管理（新建、切换、重命名、删除）
+- 流式回复，可随时停止生成
+- 对话记录保存在浏览器本地，不传服务器
+- 语音输入（Chrome / Edge）
+- Markdown 渲染 + 代码高亮，AI 输出走 XSS 过滤
+- 长对话虚拟列表
+- 三套主题（浅色、深色、冷色）
+- 危机表达检测（前后端双重），命中后弹出求助提示 + 热线电话
+- **RAG 知识库**：上传 md / txt / json 文件，对话时自动检索并引用
+- **MCP Server**：独立 MCP 服务，可在 Claude Code / Cursor 里直接配置使用
 
 ## 技术栈
 
-| 模块 | 技术 |
+| 模块 | 用了什么 |
 | --- | --- |
 | 前端 | Vue 3, Vite, Vue Router, Pinia |
-| 后端 | Node.js 原生 http/https 模块 |
-| 状态 | Pinia, localStorage |
-| 流式响应 | fetch ReadableStream, SSE 文本协议 |
-| 内容渲染 | marked, DOMPurify, highlight.js |
-| 长列表 | vue-virtual-scroller |
-| 语音输入 | Web Speech API |
-| 模型接口 | 讯飞星火 MaaS OpenAI 兼容接口 |
+| 后端 | Express, multer, MCP SDK |
+| 流式 | SSE 命名事件（token / tool / citations / done / error） |
+| 渲染 | marked, DOMPurify, highlight.js |
+| 虚拟列表 | vue-virtual-scroller |
+| 语音 | Web Speech API |
+| 向量 | Qwen text-embedding-v3（可选，不配也能跑） |
+| 模型接口 | 讯飞星火 MaaS（OpenAI 兼容），可换其他兼容接口 |
 
-## 功能范围
+## RAG 是怎么跑的
 
-- 多会话创建、切换、重命名和删除
-- 会话内容本地持久化
-- 大模型流式回复
-- 用户主动停止生成
-- Markdown 渲染和代码块高亮
-- AI 输出内容 XSS 过滤
-- 长对话虚拟列表渲染
-- 底部跟随滚动控制
-- 语音输入和中间结果预览
-- 危机表达检测和求助提示
-- 浅色、深色、冷色三套主题
+1. 前端上传文件 → `POST /api/knowledge/upload`
+2. 后端调 MCP `ingest_knowledge_documents`：按段落分块 → 分词 → 可选 embedding → 建索引
+3. 用户发消息 → 后端调 MCP `retrieve_knowledge`，用**混合检索**（embedding + BM25 关键词加权）拿相关片段
+4. 片段注入 System Prompt 给模型做参考，同时通过 SSE `citations` 事件发给前端展示
+5. 知识库存为 JSON 文件（`data/knowledge.json`），重启不会丢
+
+如果没配 Qwen embedding，会自动退化为纯 BM25 关键词检索，RAG 流程不受影响。
 
 ## 实现说明
 
 ### 流式对话
 
-前端在 `src/api/chat.js` 中使用 `fetch` 请求后端 `/api/chat`。响应体通过 `response.body.getReader()` 逐块读取，使用 `TextDecoder` 解码二进制内容，并按 SSE 的空行分隔规则解析 `data:` 行。
+前端 `api/chat.js` 用 `fetch` + `ReadableStream` 读 SSE，按 `event:` 和 `data:` 行解析。后端发四种命名事件——`token`（增量文本）、`tool`（工具调用状态）、`citations`（检索结果）、`done`/`error`。
 
-模型返回的增量文本会先进入 `useChat.js` 内部的 buffer，再通过 50ms 节流写入 Pinia store，避免每个 token 都触发一次响应式更新。
+增量文本进 `useChat.js` 的 buffer，50ms 节流写入 Pinia store，避免每个 token 都触发响应式更新。
+
+### MCP / Agent
+
+后端启动时 spawn `mcp-server.js` 作为 MCP 子进程，通过 stdio 通信。内置六个工具：
+
+- `retrieve_knowledge` — 混合检索知识库
+- `list_knowledge_documents` — 列出已上传资料
+- `ingest_knowledge_documents` — 导入资料并建索引
+- `delete_knowledge_document` — 删除指定资料
+- `clear_knowledge_documents` — 清空知识库
+- `get_current_time` — 获取当前时间
+
+`mcp-server.js` 也可以脱离后端单独跑，作为 Claude Code 的 MCP 工具使用。
 
 ### 中断生成
 
@@ -71,6 +93,7 @@ AI 回复通过 marked 转为 HTML，再经过 DOMPurify 白名单过滤后使�
 mindtree/
 ├── mindtree-backend/
 │   ├── index.js
+│   ├── mcp-server.js
 │   ├── package.json
 │   └── .env.example
 ├── mindtree-frontend/
@@ -109,6 +132,12 @@ PORT=3000
 MODEL=xop3qwen1b7
 CORS_ORIGIN=*
 MAX_BODY_BYTES=1048576
+MAX_KNOWLEDGE_FILE_BYTES=2097152
+
+# 可选：启用 embedding 向量检索
+QWEN_API_KEY=
+QWEN_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+QWEN_EMBEDDING_MODEL=text-embedding-v3
 ```
 
 ### 前端
@@ -138,23 +167,23 @@ npm run build
 ```bash
 cd mindtree-backend
 node --check index.js
+node --check mcp-server.js
 ```
 
 ## 项目边界
 
-- 当前版本没有用户账号系统。
-- 会话主要保存在浏览器 localStorage。
-- 后端没有数据库持久化。
-- 危机识别是规则匹配，不是医学判断。
-- 模型回复质量取决于上游模型能力和提示词约束。
+- 没有用户账号系统
+- 会话存在浏览器 localStorage
+- 知识库存为本地 JSON 文件，不依赖外部数据库
+- 危机识别是规则匹配，不是医学判断
+- 模型回复质量取决于上游模型和提示词
 
-## 可继续改进
+## 还没做的
 
-- 后端接入数据库保存会话
-- 增加用户登录和鉴权
-- 增加长会话摘要压缩
-- 增加情绪评分和趋势图
-- 增加部署脚本和线上环境配置说明
+- 用户登录和鉴权
+- 长会话摘要压缩（目前截断到最近 18 条消息）
+- 情绪评分和趋势图
+- 部署文档
 
 ## License
 

@@ -22,6 +22,11 @@ const renderedContent = computed(() => {
 const showThinking = computed(() => {
   return !isUser.value && props.isStreaming && !props.message.content
 })
+
+function formatScore(score) {
+  if (typeof score !== 'number') return ''
+  return score.toFixed(2)
+}
 </script>
 
 <template>
@@ -50,6 +55,36 @@ const showThinking = computed(() => {
 
       <!-- 流式光标 -->
       <span v-if="isStreaming && !isUser && message.content" class="cursor" />
+
+      <section v-if="!isUser && message.tools?.length" class="agent-panel">
+        <div class="agent-panel__head">
+          <strong>工具调用</strong>
+          <span>{{ message.tools.length }} 次</span>
+        </div>
+        <article v-for="tool in message.tools" :key="tool.id" class="tool-card">
+          <div class="tool-card__top">
+            <strong>{{ tool.name }}</strong>
+            <span :class="['tool-status', `tool-status--${tool.status}`]">{{ tool.status }}</span>
+          </div>
+          <pre>{{ JSON.stringify(tool.args || {}, null, 2) }}</pre>
+          <p v-if="tool.result">{{ tool.result }}</p>
+        </article>
+      </section>
+
+      <section v-if="!isUser && message.citations?.length" class="agent-panel">
+        <div class="agent-panel__head">
+          <strong>参考来源</strong>
+          <span>{{ message.citations.length }} 条命中</span>
+        </div>
+        <article v-for="citation in message.citations" :key="citation.id" class="source-card">
+          <div class="source-card__top">
+            <strong>{{ citation.title }}</strong>
+            <span v-if="formatScore(citation.score)">相关度 {{ formatScore(citation.score) }}</span>
+          </div>
+          <p>{{ citation.snippet }}</p>
+          <small>{{ citation.source }}</small>
+        </article>
+      </section>
     </div>
   </div>
 </template>
@@ -138,5 +173,101 @@ const showThinking = computed(() => {
 }
 @keyframes blink {
   to { visibility: hidden; }
+}
+
+.agent-panel {
+  margin-top: 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.agent-panel__head,
+.tool-card__top,
+.source-card__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.agent-panel__head strong {
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.agent-panel__head span,
+.source-card__top span {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.tool-card,
+.source-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-tertiary);
+  padding: 9px 10px;
+}
+
+.tool-card__top strong,
+.source-card__top strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  color: var(--text-primary);
+}
+
+.tool-status {
+  flex-shrink: 0;
+  border-radius: 999px;
+  padding: 2px 7px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.tool-status--success {
+  color: #5f7f48;
+}
+
+.tool-status--error {
+  color: var(--danger);
+}
+
+.tool-status--running {
+  color: var(--accent);
+}
+
+.tool-card pre {
+  max-height: 140px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin-top: 6px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.tool-card p,
+.source-card p {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+}
+
+.source-card small {
+  display: block;
+  margin-top: 6px;
+  color: var(--text-tertiary);
+  font-size: 11px;
 }
 </style>

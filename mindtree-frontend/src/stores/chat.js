@@ -1,5 +1,11 @@
 import { defineStore } from 'pinia'
 import { reactive, ref, computed } from 'vue'
+import {
+  clearKnowledgeDocuments,
+  deleteKnowledgeDocument,
+  fetchKnowledgeDocuments,
+  uploadKnowledgeDocuments,
+} from '@/api/chat'
 
 const STORAGE_KEY = 'mindtree_sessions_v1'
 
@@ -34,6 +40,12 @@ export const useChatStore = defineStore('chat', () => {
   const sessions = reactive(new Map())
   const activeId = ref(null)
   const isGenerating = ref(false)
+  const documents = ref([])
+  const retrievalMode = ref('keyword')
+  const ragEnabled = ref(true)
+  const knowledgeLoading = ref(false)
+  const knowledgeNotice = ref('')
+  const knowledgeError = ref('')
 
   function hydrate() {
     const saved = loadFromStorage()
@@ -131,6 +143,33 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  function mergeToolIntoLastAIMessage(tool) {
+    const s = sessions.get(activeId.value)
+    if (!s || s.messages.length === 0) return
+    const last = s.messages[s.messages.length - 1]
+    if (last.role !== 'assistant') return
+    if (!Array.isArray(last.tools)) last.tools = []
+    const current = last.tools.find(item => item.id === tool.id)
+    if (current) Object.assign(current, tool)
+    else last.tools.push(tool)
+  }
+
+  function setLastAICitations(citations) {
+    const s = sessions.get(activeId.value)
+    if (!s || s.messages.length === 0) return
+    const last = s.messages[s.messages.length - 1]
+    if (last.role !== 'assistant') return
+    last.citations = citations
+  }
+
+  function setLastAITools(tools) {
+    const s = sessions.get(activeId.value)
+    if (!s || s.messages.length === 0 || !tools?.length) return
+    const last = s.messages[s.messages.length - 1]
+    if (last.role !== 'assistant') return
+    last.tools = tools
+  }
+
   function fillLastAIMessageIfEmpty(content) {
     const s = sessions.get(activeId.value)
     if (!s || s.messages.length === 0) return
@@ -144,12 +183,87 @@ export const useChatStore = defineStore('chat', () => {
     debouncedSave(sessions, activeId.value)
   }
 
+  async function refreshKnowledge() {
+    knowledgeLoading.value = true
+    knowledgeError.value = ''
+    try {
+      const result = await fetchKnowledgeDocuments()
+      documents.value = result.documents
+      retrievalMode.value = result.retrievalMode
+    } catch (err) {
+      knowledgeError.value = err.message || '加载知识库失败'
+    } finally {
+      knowledgeLoading.value = false
+    }
+  }
+
+  async function uploadKnowledge(files) {
+    if (!files?.length) return
+    knowledgeLoading.value = true
+    knowledgeError.value = ''
+    knowledgeNotice.value = ''
+    try {
+      const result = await uploadKnowledgeDocuments(files)
+      documents.value = [...documents.value, ...result.documents]
+      retrievalMode.value = result.retrievalMode
+      knowledgeNotice.value = result.message || `已导入 ${result.documents.length} 份知识文件。`
+    } catch (err) {
+      knowledgeError.value = err.message || '上传知识库失败'
+    } finally {
+      knowledgeLoading.value = false
+    }
+  }
+
+  async function removeKnowledgeDocument(id) {
+    knowledgeLoading.value = true
+    knowledgeError.value = ''
+    knowledgeNotice.value = ''
+    try {
+      await deleteKnowledgeDocument(id)
+      documents.value = documents.value.filter(item => item.id !== id)
+      knowledgeNotice.value = '知识文件已移除。'
+    } catch (err) {
+      knowledgeError.value = err.message || '删除知识文件失败'
+    } finally {
+      knowledgeLoading.value = false
+    }
+  }
+
+  async function clearKnowledge() {
+    if (!documents.value.length) return
+    knowledgeLoading.value = true
+    knowledgeError.value = ''
+    knowledgeNotice.value = ''
+    try {
+      await clearKnowledgeDocuments()
+      documents.value = []
+      knowledgeNotice.value = '知识库已清空。'
+    } catch (err) {
+      knowledgeError.value = err.message || '清空知识库失败'
+    } finally {
+      knowledgeLoading.value = false
+    }
+  }
+
+  function toggleRag() {
+    ragEnabled.value = !ragEnabled.value
+  }
+
   return {
     sessions,
     activeId,
     isGenerating,
     activeMessages,
+    clearKnowledge,
+    documents,
     sessionList,
+    knowledgeError,
+    knowledgeLoading,
+    knowledgeNotice,
+    ragEnabled,
+    refreshKnowledge,
+    removeKnowledgeDocument,
+    retrievalMode,
     hydrate,
     createSession,
     switchSession,
@@ -158,6 +272,11 @@ export const useChatStore = defineStore('chat', () => {
     addMessage,
     appendToLastAIMessage,
     fillLastAIMessageIfEmpty,
+    mergeToolIntoLastAIMessage,
     persist,
+    setLastAICitations,
+    setLastAITools,
+    toggleRag,
+    uploadKnowledge,
   }
 })

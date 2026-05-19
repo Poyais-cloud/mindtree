@@ -35,16 +35,27 @@ export function useChat() {
 
     await streamChat({
       messages: apiMessages,
+      ragEnabled: store.ragEnabled,
       signal: controller.signal,
       onChunk: (text) => {
         buffer += text
         flushBuffer()
       },
-      onDone: () => {
+      onTool: (tool) => {
+        store.mergeToolIntoLastAIMessage(tool)
+        store.persist()
+      },
+      onCitations: (citations) => {
+        store.setLastAICitations(citations)
+        store.persist()
+      },
+      onDone: (payload = {}) => {
         if (buffer) {
           store.appendToLastAIMessage(buffer)
           buffer = ''
         }
+        if (payload.citations?.length) store.setLastAICitations(payload.citations)
+        if (payload.tools?.length) store.setLastAITools(payload.tools)
         store.fillLastAIMessageIfEmpty('这次没有收到有效回复。')
         store.isGenerating = false
         controller = null

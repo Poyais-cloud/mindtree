@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { useChatStore } from '@/stores/chat'
 import { usePreferencesStore, THEMES } from '@/stores/preferences'
 import AppIcon from '@/components/AppIcon.vue'
+import KnowledgePanel from '@/components/KnowledgePanel.vue'
 
 defineProps({
   collapsed: { type: Boolean, default: false },
@@ -84,6 +85,19 @@ function formatDate(ts) {
       </svg>
       <span>新建会话</span>
     </button>
+
+    <KnowledgePanel
+      :documents="store.documents"
+      :error="store.knowledgeError"
+      :loading="store.knowledgeLoading"
+      :notice="store.knowledgeNotice"
+      :rag-enabled="store.ragEnabled"
+      :retrieval-mode="store.retrievalMode"
+      @clear="store.clearKnowledge"
+      @remove="store.removeKnowledgeDocument"
+      @toggle-rag="store.toggleRag"
+      @upload="store.uploadKnowledge"
+    />
 
     <div class="list">
       <div

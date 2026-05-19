@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useChatStore } from '@/stores/chat'
 import { useChat } from '@/composables/useChat'
 import SessionSidebar from '@/components/SessionSidebar.vue'
@@ -31,6 +31,15 @@ const activeTitle = computed(() => {
   const s = store.sessions.get(store.activeId)
   return s?.title || '智语心聊'
 })
+
+const knowledgeStatus = computed(() => {
+  const rag = store.ragEnabled ? 'RAG 开' : 'RAG 关'
+  return `${rag} · ${store.documents.length} 份资料`
+})
+
+onMounted(() => {
+  store.refreshKnowledge()
+})
 </script>
 
 <template>
@@ -61,7 +70,13 @@ const activeTitle = computed(() => {
           </svg>
         </button>
         <div class="main__title">{{ activeTitle }}</div>
-        <div class="main__head-spacer" />
+        <button
+          class="knowledge-chip"
+          title="打开知识库"
+          @click="sidebarCollapsed = false"
+        >
+          {{ knowledgeStatus }}
+        </button>
       </header>
 
       <MessageList />
@@ -124,10 +139,6 @@ const activeTitle = computed(() => {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.main__head-spacer {
-  width: 32px;
-}
-
 .menu-btn {
   width: 32px;
   height: 32px;
@@ -140,6 +151,26 @@ const activeTitle = computed(() => {
 }
 .menu-btn:hover {
   background: var(--accent-soft);
+}
+
+.knowledge-chip {
+  flex-shrink: 0;
+  max-width: 150px;
+  min-height: 32px;
+  border-radius: 999px;
+  padding: 0 10px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.knowledge-chip:hover {
+  background: var(--accent-soft);
+  color: var(--text-primary);
+  border-color: var(--accent-light);
 }
 
 .error-bar {
@@ -177,5 +208,8 @@ const activeTitle = computed(() => {
     z-index: 99;
   }
   .main__head { padding: 12px 14px; }
+  .knowledge-chip {
+    max-width: 112px;
+  }
 }
 </style>
