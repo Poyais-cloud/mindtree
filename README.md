@@ -2,6 +2,8 @@
 
 MindTree（智语心聊）是一个面向情绪记录与支持性对话的本地化 AI 应用。它不是普通聊天机器人，而是将“情绪支持对话”“本地 Markdown 心情库检索”“心理日志复盘写回”结合在一起，帮助用户在压力、焦虑、睡眠、人际关系等场景中更清楚地整理自己的状态。
 
+<img width="2786" height="1462" alt="9770c99476332fdce14236f778558481" src="https://github.com/user-attachments/assets/f8f4bb4b-ef50-4bd1-a5e6-b3fd6a7592e5" />
+
 项目强调三个关键词：
 
 - **本地化**：用户可以导入自己的 Obsidian 库或任意 Markdown 文件夹作为心情库。
@@ -9,6 +11,9 @@ MindTree（智语心聊）是一个面向情绪记录与支持性对话的本地
 - **支持性**：系统不做医学诊断，不替代心理咨询，只提供情绪陪伴、压力梳理和阶段性复盘。
 
 ---
+
+<img width="2820" height="1470" alt="2c13c67b214d799d18ea6da372953276" src="https://github.com/user-attachments/assets/011a288e-9006-45b3-8cbc-6ed0e0c36357" />
+
 
 ## 1. 项目功能
 
